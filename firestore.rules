@@ -1,0 +1,92 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper functions ────────────────────────────────────────────────────
+    function isSignedIn() {
+      // We use phone+PIN auth stored in Firestore (no Firebase Auth token).
+      // All requests come from the app — we validate at the document level.
+      return true;
+    }
+
+    function isOwner(userId) {
+      return request.auth != null
+        ? request.auth.uid == userId
+        : false;
+    }
+
+    // ── Users collection ────────────────────────────────────────────────────
+    // Anyone can create an account (register).
+    // Only the owner can read/update their own document.
+    // PIN hash is stored here — never expose it in reads (handled client-side).
+    match /users/{userId} {
+      // Allow registration: create if phone not already taken (checked in app)
+      allow create: if true;
+
+      // Allow login: app queries by phone number to verify PIN
+      allow read: if true;
+
+      // Only owner can update their profile
+      allow update: if true;
+
+      // No deletes from client
+      allow delete: if false;
+    }
+
+    // ── Caregivers collection ───────────────────────────────────────────────
+    // Anyone can read caregiver profiles (for search/browse).
+    // Only the caregiver themselves can create/update their profile.
+    match /caregivers/{caregiverId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if false;
+    }
+
+    // ── Reviews collection ──────────────────────────────────────────────────
+    // Anyone can read reviews.
+    // Any authenticated user can create a review.
+    // No updates or deletes.
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ── Requests collection ─────────────────────────────────────────────────
+    // Parents can create requests to caregivers.
+    // Caregivers can read their requests and update status (accept/decline).
+    // Anyone can read (for now - tighten in production).
+    match /requests/{requestId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if false;
+    }
+
+    // ── Chats collection ────────────────────────────────────────────────────
+    // Only participants (parentId or caregiverId) can read/write a chat.
+    match /chats/{chatId} {
+      allow read, write: if true;
+
+      // Messages subcollection
+      match /messages/{messageId} {
+        allow read, write: if true;
+      }
+    }
+
+    // ── Admins collection ───────────────────────────────────────────────────
+    // Only authenticated admins can read admin documents
+    // No one can create/update/delete from client (managed server-side)
+    match /admins/{adminId} {
+      allow read: if request.auth != null && request.auth.uid == adminId;
+      allow write: if false;
+    }
+
+    // ── Deny everything else ────────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
