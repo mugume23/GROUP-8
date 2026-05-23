@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:device_preview/device_preview.dart';
 import 'firebase_options.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/onboarding_screen.dart';
@@ -14,22 +13,21 @@ import 'utils/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
-  // Disable Firestore persistence on web to avoid internal assertion errors
-  if (kIsWeb) {
-    FirebaseFirestore.instance.settings = const Settings(
-      persistenceEnabled: false,
-    );
+  
+  try {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    
+    // Disable Firestore persistence on web to avoid internal assertion errors
+    if (kIsWeb) {
+      FirebaseFirestore.instance.settings = const Settings(
+        persistenceEnabled: false,
+      );
+    }
+  } catch (e) {
+    print('Firebase initialization error: $e');
   }
 
-  runApp(
-    DevicePreview(
-      // Set enabled: false before releasing to production
-      enabled: false,
-      builder: (context) => const HomeCareApp(),
-    ),
-  );
+  runApp(const HomeCareApp());
 }
 
 class HomeCareApp extends StatelessWidget {
@@ -40,9 +38,6 @@ class HomeCareApp extends StatelessWidget {
     return MaterialApp(
       title: 'HomeCare',
       debugShowCheckedModeBanner: false,
-      // DevicePreview hooks
-      locale: DevicePreview.locale(context),
-      builder: DevicePreview.appBuilder,
       theme: AppTheme.lightTheme,
       home: const SplashRouter(),
     );
@@ -69,7 +64,8 @@ class _SplashRouterState extends State<SplashRouter> {
     final role = prefs.getString('role');
     final hasSeenOnboarding = prefs.getBool('hasSeenOnboarding') ?? false;
 
-    await Future.delayed(const Duration(seconds: 5));
+    // Reduced splash duration to 2 seconds for better UX
+    await Future.delayed(const Duration(seconds: 2));
 
     if (!mounted) return;
 
